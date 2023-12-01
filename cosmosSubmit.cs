@@ -131,7 +131,7 @@ namespace CosmosSamples.ExportToCSV
                     object[] values = new object[reader.FieldCount];
                     while (reader.Read())
                     {
-                        if (numRecords > startRecord)
+                        if (numRecords >= startRecord)
                         {
                             int num_fields = reader.GetValues(values);
                             for (int i = 0; i < num_fields; i++)
