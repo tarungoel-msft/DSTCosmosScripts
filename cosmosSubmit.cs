@@ -156,7 +156,7 @@ MODULE ""/local/Modules/PrivacyAnnotation/PrivacyAnnotation.module"" AS DataMapC
 USING Microsoft.DataMap.CodeAnnotation.Cosmos;
 
 dstErrors =
-    SSTREAM ""local/users/tarungoel/test/errorsWithDb.ss"";
+    SSTREAM ""local/users/tarungoel/errorsWithDb.ss"";
 
 errorsForthisDb = SELECT * FROM dstErrors WHERE ContentDBId == Guid.Parse(""<DEADDEAD>"");
 
