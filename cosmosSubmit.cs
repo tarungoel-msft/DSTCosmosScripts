@@ -152,11 +152,11 @@ namespace CosmosSamples.ExportToCSV
         private void CreateStream(Object dbGuid, ServiceClientCredentials creds)
         {
             string script = @"
-MODULE ""/local/Modules/PrivacyAnnotation/PrivacyAnnotation.module"" AS DataMapCodeAnnotation;
+MODULE ""/shares/exchange.storage.prod/local/PrivacyAnnotation/PrivacyAnnotation.module"" AS DataMapCodeAnnotation;
 USING Microsoft.DataMap.CodeAnnotation.Cosmos;
 
 dstErrors =
-    SSTREAM ""local/users/tarungoel/errorsWithDb.ss"";
+    SSTREAM ""local/users/tarungoel/test/errorsWithDb.ss"";
 
 errorsForthisDb = SELECT * FROM dstErrors WHERE ContentDBId == Guid.Parse(""<DEADDEAD>"");
 
@@ -166,8 +166,8 @@ OUTPUT errorsForthisDb
     WITH STREAMEXPIRY ""300"";";
 
             string modifiedScript = Regex.Replace(script, "<DEADDEAD>", dbGuid.ToString());
-            //string vc = "https://www.cosmos14.osdinfra.net/cosmos/office.adhoc/";
-            string vc = "https://cosmos14.osdinfra.net/cosmos/spo.adhoc";
+            string vc = "https://cosmos14.osdinfra.net/cosmos/office.adhoc/";
+            //string vc = "https://cosmos14.osdinfra.net/cosmos/spo.adhoc";
             string temp_folder = "D:/cps/cosmos";
             string script_filename = System.IO.Path.Combine(temp_folder, "test.script");
             VcClient.VC.SetupAadCredentials(vc, VcClient.VC.NoProxy, creds);
