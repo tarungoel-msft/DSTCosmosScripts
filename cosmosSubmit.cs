@@ -17,7 +17,6 @@ namespace CosmosSamples.ExportToCSV
         {
             var exporter = new Exporter();
             string stream = "https://cosmos14.osdinfra.net/cosmos/office.adhoc/local/users/tarungoel/test/dbWiseCount.ss";
-            // string stream = "https://cosmos14.osdinfra.net/cosmos/office.adhoc/local/users/tarungoel/test/filesets1/034f9d4f-06b7-41e5-bf14-858f56929226_data.parquet";
             string filename = @"d:\dbWiseCount1.txt";
 
             exporter.Export(stream,filename);
@@ -91,7 +90,7 @@ namespace CosmosSamples.ExportToCSV
 
         private void OutputToFile(System.Data.IDataReader reader, string fileName, string separator, string terminator, ServiceClientCredentials creds)
         {
-            using (var s = System.IO.File.Create(fileName))
+            using (var s = System.IO.File.OpenWrite(fileName))
             {
                 using (var writer = new System.IO.StreamWriter(s))
                 {
@@ -119,31 +118,41 @@ namespace CosmosSamples.ExportToCSV
 
                             if (i > 0)
                             {
-                                Console.Write(this.Separator);
+                                writer.Write(this.Separator);
                             }
-                            Console.Write("{0}", colname);
+                            writer.Write("{0}", colname);
                         }
-                        Console.Write(this.Terminator);
+                        writer.Write(this.Terminator);
                     }
 
 
                     int n = 0;
+                    int numRecords = 0, startRecord = 0;
                     object[] values = new object[reader.FieldCount];
                     while (reader.Read())
                     {
-                        int num_fields = reader.GetValues(values);
-                        for (int i = 0; i < num_fields; i++)
+                        if (numRecords > startRecord)
                         {
-                            if (i > 0)
+                            int num_fields = reader.GetValues(values);
+                            for (int i = 0; i < num_fields; i++)
                             {
-                                Console.Write(this.Separator);
+                                if (i > 0)
+                                {
+                                    writer.Write(this.Separator);
+                                }
+                                writer.Write(values[i]);
                             }
-                            Console.Write(values[i]);
-                        }
-                        Console.Write(this.Terminator);
 
-                        CreateStream(values[1], creds);
-                        n++;
+                            writer.Write(numRecords);
+                            Console.Write(numRecords);
+                            Console.Write(this.Terminator);
+
+                            numRecords++;
+                            writer.Write(this.Terminator);
+
+                            CreateStream(values[1], creds);
+                            n++;
+                        }
                     }
                 }
             }
@@ -162,17 +171,15 @@ errorsForthisDb = SELECT * FROM dstErrors WHERE ContentDBId == Guid.Parse(""<DEA
 
 [Privacy.Asset.NonPersonal]
 OUTPUT errorsForthisDb 
-    TO SSTREAM ""local/users/tarungoel/test/dstErrors_<DEADDEAD>.ss""
+    TO SSTREAM ""local/users/tarungoel/test1/dstErrors_<DEADDEAD>.ss""
     WITH STREAMEXPIRY ""300"";";
 
             string modifiedScript = Regex.Replace(script, "<DEADDEAD>", dbGuid.ToString());
             string vc = "https://cosmos14.osdinfra.net/cosmos/office.adhoc/";
-            //string vc = "https://cosmos14.osdinfra.net/cosmos/spo.adhoc";
             string temp_folder = "D:/cps/cosmos";
-            string script_filename = System.IO.Path.Combine(temp_folder, "test.script");
+            string fileName = string.Format("test_{0}.script", dbGuid.ToString());
+            string script_filename = System.IO.Path.Combine(temp_folder, fileName);
             VcClient.VC.SetupAadCredentials(vc, VcClient.VC.NoProxy, creds);
-            // VcClient.VC.Setup(vc, VcClient.VC.NoProxy, null);
-            // Create a Script and submit it
             System.IO.File.WriteAllText(script_filename, modifiedScript);
 
             // For VcClient that setup with AAD Credential
@@ -180,58 +187,16 @@ OUTPUT errorsForthisDb
 
             ScopeClient.ScopeEnvironment.Instance.WorkingRoot = temp_folder;
 
-            if (false)
+            ScopeClient.SubmitParameters subParams = new ScopeClient.SubmitParameters(script_filename)
             {
-                var subParams = new ScopeClient.SubmitParameters(script_filename);
-                var jobinfo = ScopeClient.Scope.Submit(subParams);
+                NebulaCommandLineArgs = "-on useaadauthentication -u tarungoel_debug@prdtrs01.prod.outlook.com"
+            };
 
-                // Wait
-                WaitUntilJobFinished(jobinfo);
-            }
-            else if(false)
-            {
-                string vcName = "https://cosmos14.osdinfra.net/cosmos/spo.adhoc";
-                string dataRoot = vcName;
-                string scriptUpdatedFile = string.Empty;
+            ScopeClient.Scope.VCSettings vcSettings = new ScopeClient.Scope.VCSettings();
+            JobInfo jobinfo = ScopeClient.Scope.Submit(vc, null, null, subParams);
+            WaitUntilJobFinished(jobinfo);
 
-                ScopeCompiler.Parser.ParseInformation parserInfo = ScopeClient.Scope.ExtractJobResources(
-                    script_filename, 
-                    scopePath: "$(CLUSTER_ROOT)/local/Modules/PrivacyAnnotation/", 
-                    dataRoot, 
-                    accessToken: creds.ToString(), 
-                    null, 
-                    "-on useaadauthentication -u tarungoel_debug@prdtrs01.prod.outlook.com",
-                    null, 
-                    out scriptUpdatedFile);
-               
-
-                var jobSubmitParam = new SubmitJobParameters()
-                {
-                    // If you need to use Cosmos TEST clusters such as https://cosmostaurus.osdinfra.net/, please have a look at AadDogFoodHelper.cs.
-                    VcName = vcName,
-                    Name = "ScopeLab_SimpleTestJob",
-                    RuntimeName = "default",
-                    ScopeScriptFileNameOrCmdOrGraph = script_filename,
-                };
-
-                var jobInfo = VC.SubmitJob(jobSubmitParam, true);
-                WaitUntilJobFinished(jobInfo);
-
-                Console.WriteLine($"job uri: {jobInfo.JobUrl}, state: {jobInfo.State}");
-            }
-            else
-            {
-                ScopeClient.SubmitParameters subParams = new ScopeClient.SubmitParameters(script_filename) 
-                {
-                    NebulaCommandLineArgs = "-on useaadauthentication -u tarungoel_debug@prdtrs01.prod.outlook.com" 
-                };
-
-                ScopeClient.Scope.VCSettings vcSettings = new ScopeClient.Scope.VCSettings();
-                ScopeClient.Scope.Submit(vc, null, null, subParams);
-            }
-
-            System.Console.WriteLine("Press any key to continue");
-            System.Console.ReadKey();
+            System.Console.WriteLine("Completed job\n");
         }
 
         private static void WaitUntilJobFinished(JobInfo jobinfo)
