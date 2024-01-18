@@ -13,13 +13,13 @@ namespace CosmosSamples.ExportToCSV
 {
     class Program
     {
+
         static void Main(string[] args)
         {
             var exporter = new Exporter();
-            string stream = "https://cosmos14.osdinfra.net/cosmos/office.adhoc/local/users/tarungoel/test/dbWiseCount.ss";
-            string filename = @"d:\dbWiseCount1.txt";
+            string stream = "https://cosmos14.osdinfra.net/cosmos/spo.adhoc/local/tarungoel/dbWiseStats.ss";
 
-            exporter.Export(stream,filename);
+            exporter.Export(stream);
 
         }
     }
@@ -32,13 +32,18 @@ namespace CosmosSamples.ExportToCSV
         public int Top = -1;
         public string[] Columns;
 
+        public string date = DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss");
+        public string LocalFolder = "D:/cps/cosmos_" + DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss");
+
         public Exporter()
         {
 
         }
 
-        public void Export(string stream, string filename)
+        public void Export(string stream)
         {
+            System.IO.Directory.CreateDirectory(LocalFolder);
+            string filename = LocalFolder + @"dbWiseCount.txt";
             var settings = new Microsoft.Cosmos.ExportClient.ScopeExportSettings();
             settings.Path = stream;
 
@@ -71,14 +76,13 @@ namespace CosmosSamples.ExportToCSV
             try
             {
                 var task = exportClient.Export(null, new System.Threading.CancellationToken());
-                var readTask = task.ContinueWith((prevTask) =>
+
+                task.Wait();
+
+                using (System.Data.IDataReader dataReader = task.Result.DataReader)
                 {
-                    using (System.Data.IDataReader dataReader = prevTask.Result.DataReader)
-                    {
-                        OutputToFile(dataReader, filename, this.Separator, this.Terminator, settings.ServiceClientCredentials);
-                    }
-                });
-                readTask.Wait();
+                    OutputToFile(dataReader, filename, this.Separator, this.Terminator, settings.ServiceClientCredentials);
+                }
             }
             catch (System.AggregateException ae)
             {
@@ -103,7 +107,6 @@ namespace CosmosSamples.ExportToCSV
                     var schemacol_providertype = schematable.Columns["ProviderType"];
                     var schemacol_allowdbnull = schematable.Columns["AllowDBNull"];
 
-
                     var column_names = new string[schematable.Rows.Count];
                     if (!this.ExcludeHeaders)
                     {
@@ -125,9 +128,7 @@ namespace CosmosSamples.ExportToCSV
                         writer.Write(this.Terminator);
                     }
 
-
-                    int n = 0;
-                    int numRecords = 0, startRecord = 0;
+                    long numRecords = 0, startRecord = 0, n = 0;
                     object[] values = new object[reader.FieldCount];
                     while (reader.Read())
                     {
@@ -147,37 +148,43 @@ namespace CosmosSamples.ExportToCSV
                             Console.Write(numRecords);
                             Console.Write(this.Terminator);
 
-                            numRecords++;
                             writer.Write(this.Terminator);
 
-                            CreateStream(values[1], creds);
+                            CreateStream(values[1], creds, startRecord, numRecords);
                             n++;
                         }
+                        else
+                        {
+                            Console.Write("Skipping record {0}", numRecords);
+                        }
+                        numRecords++;
                     }
                 }
             }
         }
 
-        private void CreateStream(Object dbGuid, ServiceClientCredentials creds)
+        private void CreateStream(Object dbGuid, ServiceClientCredentials creds, long startRecord, long numRec)
         {
             string script = @"
 MODULE ""/shares/exchange.storage.prod/local/PrivacyAnnotation/PrivacyAnnotation.module"" AS DataMapCodeAnnotation;
 USING Microsoft.DataMap.CodeAnnotation.Cosmos;
 
 dstErrors =
-    SSTREAM ""local/users/tarungoel/test/errorsWithDb.ss"";
+    SSTREAM ""shares/spo.adhoc/local/tarungoel/errorsWithDb.ss"";
 
 errorsForthisDb = SELECT * FROM dstErrors WHERE ContentDBId == Guid.Parse(""<DEADDEAD>"");
 
 [Privacy.Asset.NonPersonal]
 OUTPUT errorsForthisDb 
-    TO SSTREAM ""local/users/tarungoel/test1/dstErrors_<DEADDEAD>.ss""
+    TO SSTREAM ""shares/spo.adhoc/local/tarungoel/test<DATEDATE>_<STARTSTART>/dstErrors_<DEADDEAD>.ss""
     WITH STREAMEXPIRY ""300"";";
 
             string modifiedScript = Regex.Replace(script, "<DEADDEAD>", dbGuid.ToString());
+            modifiedScript = Regex.Replace(modifiedScript, "<DATEDATE>", date);
+            modifiedScript = Regex.Replace(modifiedScript, "<STARTSTART>", startRecord.ToString());
             string vc = "https://cosmos14.osdinfra.net/cosmos/office.adhoc/";
-            string temp_folder = "D:/cps/cosmos";
-            string fileName = string.Format("test_{0}.script", dbGuid.ToString());
+            string temp_folder = "D:/cps/cosmos_" + date;
+            string fileName = string.Format("test_{0}_{1}.script", dbGuid.ToString(), numRec);
             string script_filename = System.IO.Path.Combine(temp_folder, fileName);
             VcClient.VC.SetupAadCredentials(vc, VcClient.VC.NoProxy, creds);
             System.IO.File.WriteAllText(script_filename, modifiedScript);
@@ -194,7 +201,7 @@ OUTPUT errorsForthisDb
 
             ScopeClient.Scope.VCSettings vcSettings = new ScopeClient.Scope.VCSettings();
             JobInfo jobinfo = ScopeClient.Scope.Submit(vc, null, null, subParams);
-            WaitUntilJobFinished(jobinfo);
+            //WaitUntilJobFinished(jobinfo);
 
             System.Console.WriteLine("Completed job\n");
         }
@@ -221,4 +228,4 @@ OUTPUT errorsForthisDb
             }
         }
     }
-    }
+}
