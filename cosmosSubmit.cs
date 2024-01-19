@@ -129,6 +129,8 @@ namespace CosmosSamples.ExportToCSV
                     }
 
                     long numRecords = 0, startRecord = 0, n = 0;
+                    Console.Write("Enter start index: ");
+                    startRecord = 410;
                     object[] values = new object[reader.FieldCount];
                     while (reader.Read())
                     {
@@ -196,7 +198,7 @@ OUTPUT errorsForthisDb
 
             ScopeClient.SubmitParameters subParams = new ScopeClient.SubmitParameters(script_filename)
             {
-                NebulaCommandLineArgs = "-on useaadauthentication -u tarungoel_debug@prdtrs01.prod.outlook.com"
+                NebulaCommandLineArgs = "-on useaadauthentication -u tarungoel_debug@prdtrs01.prod.outlook.com",
             };
 
             ScopeClient.Scope.VCSettings vcSettings = new ScopeClient.Scope.VCSettings();
